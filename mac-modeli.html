@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Maç Modeli</title>
+<style>
+  :root{--paper:#FAF8F4;--card:#FFF;--ink:#16191D;--muted:#71767E;
+    --rule:#E4E0D8;--signal:#17457E;--flag:#9A4A1C;--ok:#2E6B45}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--paper);color:var(--ink);
+    font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;-webkit-text-size-adjust:100%}
+  .wrap{max-width:800px;margin:0 auto;padding:20px 16px 64px}
+  h1{font:600 27px/1.15 Georgia,"Times New Roman",serif;margin:0 0 6px;letter-spacing:-.01em}
+  h2{font:600 18px/1.2 Georgia,serif;margin:32px 0 10px}
+  .sub{color:var(--muted);margin:0 0 22px;font-size:14px;max-width:62ch}
+
+  .drop{border:1px dashed var(--rule);background:var(--card);border-radius:3px;
+    padding:26px 18px;text-align:center;cursor:pointer;margin-bottom:8px}
+  .drop.over{border-color:var(--signal);background:#F2F6FB}
+  .drop b{display:block;font-size:15px;margin-bottom:4px}
+  .drop span{color:var(--muted);font-size:13px}
+  .files{font-size:12.5px;color:var(--muted);margin-bottom:18px;min-height:18px}
+
+  .src{background:var(--card);border:1px solid var(--rule);border-radius:3px;padding:14px;margin-bottom:22px;font-size:13.5px;line-height:1.7}
+  .src code{background:#F3F0EA;padding:1px 5px;border-radius:2px;font-size:12.5px;word-break:break-all}
+  .src p{margin:0 0 8px}.src p:last-child{margin:0}
+
+  .ctl{background:var(--card);border:1px solid var(--rule);border-radius:3px;padding:16px;margin-bottom:22px}
+  .slHead{display:flex;justify-content:space-between;font-size:13.5px;margin-bottom:6px}
+  .slHead b{font-variant-numeric:tabular-nums}
+  input[type=range]{width:100%;accent-color:var(--signal);height:26px}
+
+  .verdict{background:var(--card);border:1px solid var(--rule);border-left:3px solid var(--signal);
+    border-radius:3px;padding:16px;margin-bottom:6px}
+  .vNum{font:600 32px/1 Georgia,serif;letter-spacing:-.02em;margin-bottom:4px}
+  .vTxt{font-size:14px;line-height:1.55;color:var(--muted)}
+  .vTxt b{color:var(--ink);font-weight:600}
+
+  table{width:100%;border-collapse:collapse;background:var(--card);border:1px solid var(--rule);
+    border-radius:3px;font-size:13.5px}
+  th{text-align:right;font-weight:600;color:var(--muted);font-size:12.5px;padding:9px 7px;
+    border-bottom:1px solid var(--rule)}
+  th:first-child,td:first-child{text-align:left}
+  td{padding:9px 7px;border-bottom:1px solid var(--rule);text-align:right;font-variant-numeric:tabular-nums}
+  tr:last-child td{border-bottom:0}
+  .good{color:var(--ok);font-weight:600}.bad{color:var(--flag);font-weight:600}
+  .sm{color:var(--muted);font-size:12.5px}
+  .empty{background:var(--card);border:1px dashed var(--rule);border-radius:3px;
+    padding:26px 18px;text-align:center;color:var(--muted);font-size:14px;line-height:1.55}
+  .note{font-size:12.5px;color:var(--muted);line-height:1.6;margin-top:28px;
+    padding-top:16px;border-top:1px solid var(--rule)}
+  .note p{margin:0 0 8px}
+  :focus-visible{outline:2px solid var(--signal);outline-offset:2px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>Maç Modeli</h1>
+<p class="sub">football-data.co.uk CSV dosyalarını sürükle. Model geçmiş maçlarla kendini ölçer, sonra oynanmamış maçlar için tahmin üretir ve piyasa oranıyla yan yana koyar.</p>
+
+<div class="src">
+  <p><b>Hangi dosyalar:</b></p>
+  <p>Geçmiş sezon — <code>football-data.co.uk/mmz4281/2526/E0.csv</code><br>
+     <span class="sm">Kodlar: E0 Premier, E1 Championship, D1 Bundesliga, D2 2.Bundesliga, I1 Serie A, SP1 La Liga, F1 Ligue 1, N1 Eredivisie, B1 Belçika, P1 Portekiz, T1 Süper Lig, G1 Yunanistan, SC0 İskoçya</span></p>
+  <p>Bu sezon — aynı adres, <code>2627</code> klasörü</p>
+  <p>İskandinavya — <code>football-data.co.uk/new/DNK.csv</code> (NOR, SWE)</p>
+  <p>Oynanmamış maçlar — <code>football-data.co.uk/fixtures.csv</code></p>
+  <p class="sm">En az bir geçmiş sezon + fixtures.csv yükle. Ne kadar çok sezon, o kadar sağlam istatistik.</p>
+</div>
+
+<div class="drop" id="drop" tabindex="0" role="button">
+  <b>CSV dosyalarını buraya bırak</b>
+  <span>ya da dokunup seç — birden fazla olabilir</span>
+  <input type="file" id="fi" accept=".csv" multiple hidden>
+</div>
+<div class="files" id="files"></div>
+
+<div class="ctl">
+  <div class="slHead"><span>En düşük model olasılığı</span><b id="pv">70%</b></div>
+  <input type="range" id="pMin" min="50" max="90" value="70" step="1">
+</div>
+
+<div id="out"></div>
+
+<div class="note">
+  <p>İleriye bakma yok: 20. haftadaki maç tahmin edilirken yalnızca önceki haftaların golleri kullanılır. Bir takım ev sahibi olarak 5 maç oynamadan tahmin üretilmez.</p>
+  <p>"Piyasa oranı" sütunu bahisçilerin o maça verdiği kapanış ortalamasıdır. Modelin olasılığı ile piyasanınki çakışmıyorsa, çoğu zaman haklı olan piyasadır — fark, modelin o maçta kör olduğu anlamına gelir.</p>
+  <p>Model gol ortalamasına bakar. Sakatlık, kart cezası, rotasyon, derbi, hava yoktur.</p>
+</div>
+</div>
+
+<script>
+const results=[], fixtures=[];
+const $=id=>document.getElementById(id);
+
+/* ---------- CSV ---------- */
+function parseCSV(txt){
+  txt=txt.replace(/^\uFEFF/,"");
+  const lines=txt.split(/\r?\n/).filter(l=>l.trim());
+  if(!lines.length)return[];
+  const head=lines[0].split(",").map(s=>s.trim());
+  return lines.slice(1).map(l=>{
+    const c=l.split(","), o={};
+    head.forEach((h,i)=>o[h]=(c[i]||"").trim());
+    return o;
+  });
+}
+function pdate(s){
+  if(!s)return null;
+  const m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+  if(!m)return null;
+  let y=+m[3]; if(y<100) y+= y>70?1900:2000;
+  return new Date(y,+m[2]-1,+m[1]);
+}
+const num=v=>{const n=parseFloat(v);return isFinite(n)&&n>0?n:null;};
+
+function ingest(rows,name){
+  if(!rows.length)return "boş";
+  const h=Object.keys(rows[0]);
+  if(h.includes("FTHG")){                                   // ana lig, sonuçlu
+    let n=0;
+    rows.forEach(r=>{
+      const d=pdate(r.Date), gh=parseInt(r.FTHG), ga=parseInt(r.FTAG);
+      if(!d||isNaN(gh)||isNaN(ga))return;
+      results.push({lg:r.Div||name,d,home:r.HomeTeam,away:r.AwayTeam,gh,ga,
+        oH:num(r.AvgH)||num(r.B365H),oD:num(r.AvgD)||num(r.B365D),oA:num(r.AvgA)||num(r.B365A),
+        oO:num(r["Avg>2.5"])||num(r["B365>2.5"]),oU:num(r["Avg<2.5"])||num(r["B365<2.5"])});
+      n++;
+    });
+    return n+" maç";
+  }
+  if(h.includes("HG")&&h.includes("Home")){                 // ek lig, sonuçlu
+    let n=0;
+    rows.forEach(r=>{
+      const d=pdate(r.Date), gh=parseInt(r.HG), ga=parseInt(r.AG);
+      if(!d||isNaN(gh)||isNaN(ga))return;
+      results.push({lg:(r.Country||"")+" "+(r.League||""),d,home:r.Home,away:r.Away,gh,ga,
+        oH:num(r.AvgCH),oD:num(r.AvgCD),oA:num(r.AvgCA),oO:null,oU:null});
+      n++;
+    });
+    return n+" maç";
+  }
+  if(h.includes("HomeTeam")){                               // oynanmamış
+    let n=0;
+    rows.forEach(r=>{
+      const d=pdate(r.Date); if(!d)return;
+      fixtures.push({lg:r.Div||name,d,time:r.Time||"",home:r.HomeTeam,away:r.AwayTeam,
+        oH:num(r.AvgH)||num(r.B365H),oD:num(r.AvgD)||num(r.B365D),oA:num(r.AvgA)||num(r.B365A),
+        oO:num(r["Avg>2.5"])||num(r["B365>2.5"]),oU:num(r["Avg<2.5"])||num(r["B365<2.5"])});
+      n++;
+    });
+    return n+" fikstür";
+  }
+  return "tanınmadı";
+}
+
+/* ---------- model ---------- */
+function pois(k,l){let r=Math.exp(-l);for(let i=1;i<=k;i++)r*=l/i;return r;}
+function markets(lh,la){
+  let h=0,d=0,a=0,u25=0,u15=0;
+  for(let i=0;i<9;i++)for(let j=0;j<9;j++){
+    const p=pois(i,lh)*pois(j,la);
+    if(i>j)h+=p;else if(i===j)d+=p;else a+=p;
+    if(i+j<=2)u25+=p; if(i+j<=1)u15+=p;
+  }
+  const b=(1-Math.exp(-lh))*(1-Math.exp(-la));
+  return {"MS 1":h,"MS 2":a,"1X":h+d,"X2":a+d,"1.5 üstü":1-u15,
+          "2.5 üstü":1-u25,"2.5 altı":u25,"KG var":b,"KG yok":1-b};
+}
+function won(gh,ga){
+  return {"MS 1":gh>ga,"MS 2":ga>gh,"1X":gh>=ga,"X2":ga>=gh,"1.5 üstü":gh+ga>1,
+          "2.5 üstü":gh+ga>2,"2.5 altı":gh+ga<3,"KG var":gh>0&&ga>0,"KG yok":!(gh>0&&ga>0)};
+}
+const ODDCOL={"MS 1":"oH","MS 2":"oA","2.5 üstü":"oO","2.5 altı":"oU"};
+
+let preds=[], state={};
+function build(){
+  preds=[]; state={};
+  results.sort((a,b)=>a.d-b.d);
+  const L={};
+  results.forEach(m=>{
+    const lg=L[m.lg]||(L[m.lg]={t:{},hg:0,ag:0,n:0});
+    const g=id=>lg.t[id]||(lg.t[id]={hp:0,hf:0,ha:0,ap:0,af:0,aa:0});
+    const H=g(m.home), A=g(m.away);
+
+    if(H.hp>=5&&A.ap>=5&&lg.n>=40){
+      const avgH=lg.hg/lg.n, avgA=lg.ag/lg.n;
+      if(avgH>0&&avgA>0){
+        const lh=Math.max(.15,(H.hf/H.hp/avgH)*(A.aa/A.ap/avgH)*avgH);
+        const la=Math.max(.15,(A.af/A.ap/avgA)*(H.ha/H.hp/avgA)*avgA);
+        const mk=markets(lh,la), w=won(m.gh,m.ga);
+        for(const k in mk){
+          const oc=ODDCOL[k];
+          preds.push({mkt:k,p:mk[k],win:w[k],odds:oc?m[oc]:null});
+        }
+      }
+    }
+    H.hp++;H.hf+=m.gh;H.ha+=m.ga; A.ap++;A.af+=m.ga;A.aa+=m.gh;
+    lg.hg+=m.gh;lg.ag+=m.ga;lg.n++;
+  });
+  state=L;
+}
+function predictFixture(f){
+  const lg=state[f.lg]; if(!lg||lg.n<40)return null;
+  const H=lg.t[f.home], A=lg.t[f.away];
+  if(!H||!A||H.hp<5||A.ap<5)return null;
+  const avgH=lg.hg/lg.n, avgA=lg.ag/lg.n;
+  const lh=Math.max(.15,(H.hf/H.hp/avgH)*(A.aa/A.ap/avgH)*avgH);
+  const la=Math.max(.15,(A.af/A.ap/avgA)*(H.ha/H.hp/avgA)*avgA);
+  return {lh,la,mk:markets(lh,la)};
+}
+
+/* ---------- dosya ---------- */
+const drop=$("drop"), fi=$("fi");
+drop.onclick=()=>fi.click();
+drop.onkeydown=e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();fi.click();}};
+drop.ondragover=e=>{e.preventDefault();drop.classList.add("over");};
+drop.ondragleave=()=>drop.classList.remove("over");
+drop.ondrop=e=>{e.preventDefault();drop.classList.remove("over");load(e.dataTransfer.files);};
+fi.onchange=()=>load(fi.files);
+
+const loaded=[];
+function load(fl){
+  let left=fl.length; if(!left)return;
+  [...fl].forEach(f=>{
+    const rd=new FileReader();
+    rd.onload=()=>{
+      let info;
+      try{ info=ingest(parseCSV(rd.result),f.name); }catch(e){ info="okunamadı"; }
+      loaded.push(f.name+" · "+info);
+      if(!--left){
+        $("files").textContent=loaded.join("   |   ");
+        build(); render();
+      }
+    };
+    rd.readAsText(f,"utf-8");
+  });
+}
+
+/* ---------- çıktı ---------- */
+function render(){
+  const pMin=+$("pMin").value/100;
+  $("pv").textContent=Math.round(pMin*100)+"%";
+  const out=$("out"); out.innerHTML="";
+
+  if(!results.length){
+    out.innerHTML=`<div class="empty">Henüz sonuç dosyası yüklenmedi.</div>`;
+    return;
+  }
+
+  /* özet */
+  const hi=preds.filter(x=>x.p>=pMin);
+  const hw=hi.filter(x=>x.win).length;
+  const rate=hi.length?hw/hi.length:0;
+  const withOdds=hi.filter(x=>x.odds);
+  const avgOdds=withOdds.length?withOdds.reduce((s,x)=>s+x.odds,0)/withOdds.length:null;
+
+  const v=document.createElement("div"); v.className="verdict";
+  v.innerHTML = hi.length<50
+    ? `<div class="vTxt">Bu eşikte yeterli tahmin yok (${hi.length}). Eşiği düşür ya da daha çok sezon yükle.</div>`
+    : `<div class="vNum ${rate>=pMin?"":""}">%${(rate*100).toFixed(1)}</div>
+       <div class="vTxt">Model <b>%${Math.round(pMin*100)}+</b> dediği ${hi.length.toLocaleString("tr-TR")} seçimde gerçek isabet bu.
+       ${avgOdds?`Bu seçimlere piyasanın verdiği ortalama oran <b>${avgOdds.toFixed(2)}</b>.`:""}
+       Gerçekleşen isabetin adil karşılığı ${(1/Math.max(rate,.01)).toFixed(2)}.</div>`;
+  out.appendChild(v);
+
+  /* kalibrasyon */
+  let h=document.createElement("h2"); h.textContent="Model ne dedi, ne oldu"; out.appendChild(h);
+  const bins=[[.50,.55],[.55,.60],[.60,.65],[.65,.70],[.70,.75],[.75,.80],[.80,.85],[.85,1.01]];
+  let t=`<table><tr><th>Model dedi</th><th>Adet</th><th>Gerçek</th><th>Fark</th><th>Piyasa oranı</th></tr>`;
+  bins.forEach(([lo,up])=>{
+    const g=preds.filter(x=>x.p>=lo&&x.p<up); if(g.length<40)return;
+    const w=g.filter(x=>x.win).length/g.length, mid=(lo+up)/2, df=(w-mid)*100;
+    const o=g.filter(x=>x.odds);
+    const ao=o.length?(o.reduce((s,x)=>s+x.odds,0)/o.length).toFixed(2):"—";
+    t+=`<tr><td>%${lo*100|0}–${up*100|0}</td><td>${g.length.toLocaleString("tr-TR")}</td>
+        <td>%${(w*100).toFixed(1)}</td>
+        <td class="${df>=0?"good":"bad"}">${df>=0?"+":""}${df.toFixed(1)}</td><td>${ao}</td></tr>`;
+  });
+  t+=`</table>`;
+  let d=document.createElement("div"); d.innerHTML=t; out.appendChild(d);
+
+  /* market kırılımı */
+  h=document.createElement("h2"); h.textContent="Hangi market eşiği taşıyor"; out.appendChild(h);
+  const byM={}; hi.forEach(x=>(byM[x.mkt]=byM[x.mkt]||[]).push(x));
+  const rows=Object.entries(byM).map(([k,g])=>{
+    const o=g.filter(x=>x.odds);
+    return {k,n:g.length,w:g.filter(x=>x.win).length/g.length,
+            o:o.length?o.reduce((s,x)=>s+x.odds,0)/o.length:null};
+  }).filter(r=>r.n>=40).sort((a,b)=>b.w-a.w);
+  if(rows.length){
+    let t2=`<table><tr><th>Market</th><th>Adet</th><th>Gerçek isabet</th><th>Piyasa oranı</th></tr>`;
+    rows.forEach(r=>t2+=`<tr><td>${r.k}</td><td>${r.n.toLocaleString("tr-TR")}</td>
+      <td class="${r.w>=pMin?"good":"bad"}">%${(r.w*100).toFixed(1)}</td>
+      <td>${r.o?r.o.toFixed(2):"—"}</td></tr>`);
+    t2+=`</table>`;
+    d=document.createElement("div"); d.innerHTML=t2; out.appendChild(d);
+  }else out.insertAdjacentHTML("beforeend",`<div class="empty">Örneklem yetersiz.</div>`);
+
+  /* yaklaşan maçlar */
+  h=document.createElement("h2"); h.textContent="Oynanmamış maçlar"; out.appendChild(h);
+  if(!fixtures.length){
+    out.insertAdjacentHTML("beforeend",`<div class="empty">fixtures.csv yüklenmedi.</div>`);
+    return;
+  }
+  const list=[];
+  fixtures.sort((a,b)=>a.d-b.d).forEach(f=>{
+    const pr=predictFixture(f); if(!pr)return;
+    Object.entries(pr.mk).forEach(([k,p])=>{
+      if(p<pMin)return;
+      const oc=ODDCOL[k], mo=oc?f[oc]:null;
+      list.push({f,k,p,mo});
+    });
+  });
+  if(!list.length){
+    out.insertAdjacentHTML("beforeend",
+      `<div class="empty">Bu eşiği geçen maç yok. Eşiği düşür, ya da ilgili ligin sezon dosyasını da yükle — takım istatistiği olmayan maç tahmin edilmiyor.</div>`);
+    return;
+  }
+  list.sort((a,b)=>b.p-a.p);
+  let t3=`<table><tr><th>Maç</th><th>Seçim</th><th>Model</th><th>Piyasa</th><th>Fark</th></tr>`;
+  list.slice(0,60).forEach(r=>{
+    const mp=r.mo?1/r.mo:null;
+    const df=mp?(r.p-mp)*100:null;
+    t3+=`<tr><td>${r.f.home} – ${r.f.away}<div class="sm">${r.f.d.toLocaleDateString("tr-TR",{day:"numeric",month:"short"})} ${r.f.time}</div></td>
+      <td>${r.k}</td><td>%${(r.p*100).toFixed(0)}</td>
+      <td>${r.mo?r.mo.toFixed(2):"—"}${mp?`<div class="sm">%${(mp*100).toFixed(0)}</div>`:""}</td>
+      <td class="${df===null?"":df>=0?"good":"bad"}">${df===null?"—":(df>=0?"+":"")+df.toFixed(0)}</td></tr>`;
+  });
+  t3+=`</table>`;
+  d=document.createElement("div"); d.innerHTML=t3; out.appendChild(d);
+}
+$("pMin").oninput=render;
+render();
+</script>
+</body>
+</html>
